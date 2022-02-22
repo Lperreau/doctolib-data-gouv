@@ -15,5 +15,7 @@ Run command `pip install -r requirements.txt`
 
 ## Create a new database, a user and grant accesses
 1. Run `create database doctolib_data;`
-2. Run `create user robot with encrypted password 'doctolib';`
+2. Run `create user louis with encrypted password 'doctolib';`
+ 1. Make sure the user name is the same as your linux user name
+ 1. If you don't you might get the following error: "psycopg.OperationalError: connection failed: FATAL:  Peer authentication failed for user "robot" "
 3. Run `grant all privileges on database doctolib_data to robot;`
