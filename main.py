@@ -2,7 +2,6 @@ import os
 import psycopg
 import json
 import csv
-import pandas
 
 SCRIPT_NAME = 'doctolib-data-gouv'
 PG_CONN_STRING = "dbname=doctolib_data user=louis"
@@ -81,15 +80,20 @@ def read_json_file(file_path):
     return data
 
 def read_csv_file(file_path, encoding = 'utf-8'):
+    file_data = []
     with open(file_path, newline='', encoding=encoding) as csv_file:
         try:
             dialect = csv.Sniffer().sniff(csv_file.read(1024))
-            print(dialect)
             csv_file.seek(0)
             reader = csv.reader(csv_file, dialect)
-            print(file_path, reader)
+            reader = csv.DictReader(csv_file)
+            for row in reader:
+                file_data.append(row)
         except UnicodeDecodeError as e:
-            print(file_path, e)
+            print('unicode error', file_path, e)
+        except:
+            print('error reading CSV', file_path)
+    return file_data
         # try:
         #     for row in reader:
         #         print(row)
@@ -147,6 +151,7 @@ def main(name, pg_conn, data_folder):
     init_db_tables(pg_conn)
     print('all tables created') 
     data = get_data(data_folder)
-    print('get data successful')
+    print(data.keys())
+    print(data['./raw_data/vaccinations_vs_appointments.csv'])
 
 main(SCRIPT_NAME, PG_CONN_STRING, DATA_FOLDER)
