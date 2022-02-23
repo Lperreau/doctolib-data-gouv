@@ -13,7 +13,7 @@ def init_db_tables(pg_conn_string):
         print('connected to db')
         with db_conn.cursor() as cur:
             cur.execute("""
-                DROP TABLE IF EXISTS public.src_stocks, doctolib_centers_metadata, doctolib_centers_profile;
+                DROP TABLE IF EXISTS src_stocks, allocation_vs_appointment, doctolib_centers_metadata, doctolib_centers_profile;
                 """)
             cur.execute("""
                 CREATE TABLE src_stocks (
@@ -27,6 +27,20 @@ def init_db_tables(pg_conn_string):
                     nb_doses INTEGER,
                     date DATE)
                 """)
+            cur.execute('''
+                CREATE TABLE allocation_vs_appointment (
+                code_region varchar(8),
+                region varchar(64),
+                departement varchar(64),
+                id_centre varchar(64),
+                nom_centre text,
+                rang_vaccinal integer,
+                date_debut_semaine date,
+                nb integer,
+                nb_rdv_cnam integer,
+                nb_rdv_rappel integer
+            )
+            ''')
             cur.execute("""
                 CREATE TABLE doctolib_centers_metadata (
                     id serial PRIMARY KEY,
@@ -94,15 +108,8 @@ def read_csv_file(file_path, encoding = 'utf-8'):
         except:
             print('error reading CSV', file_path)
     return file_data
-        # try:
-        #     for row in reader:
-        #         print(row)
-        # except csv.Error as e:
-        #     print('error reading csv file', e)
-        # except UnicodeDecodeError as e:
-        #     print('encoding error', e)
 
-def insert_metadata_in_db(metadata):
+def insert_metadata_in_db(pg_conn_string, metadata):
     with psycopg.connect(pg_conn_string) as db_conn:
         with db_conn.cursor() as cur:
             cur.execute("""
@@ -111,7 +118,7 @@ def insert_metadata_in_db(metadata):
             """,
             metadata)
 
-def insert_profile_in_db(profile):
+def insert_profile_in_db(pg_conn_string, profile):
     with psycopg.connect(pg_conn_string) as db_conn:
         with db_conn.cursor() as cur:
             # we serialize `speciality` key, because it is a dict,
@@ -123,18 +130,15 @@ def insert_profile_in_db(profile):
             """,
             profile)
 
-def read_file_stocks_csv(file_path):
-    file = open(file_path)
-    data = csv.DictReader(file)
-    return data
-
-def insert_stocks_in_db(stocks):
+def insert_allocation_vs_appointment_in_db(pg_conn_string, data):
     with psycopg.connect(pg_conn_string) as db_conn:
         with db_conn.cursor() as cur:
-            cur.execute('''
-            INSERT INTO src_stocks VALUE (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ''', stocks)
-            print('table stocks created')
+            for item in data:
+                cur.execute('''
+                INSERT INTO allocation_vs_appointment(code_region,region,departement,id_centre,nom_centre,rang_vaccinal,date_debut_semaine,nb,nb_rdv_cnam,nb_rdv_rappel) 
+                VALUES (%(code_region)s,%(region)s,%(departement)s,%(id_centre)s,%(nom_centre)s,%(rang_vaccinal)s,%(date_debut_semaine)s,%(nb)s,%(nb_rdv_cnam)s, %(nb_rdv_rappel)s)
+                ''', item)
+            print('table allocation vs appointment created')
 
 def insert_data_in_db():
     for data_key, centers in data.items():
@@ -151,7 +155,9 @@ def main(name, pg_conn, data_folder):
     init_db_tables(pg_conn)
     print('all tables created') 
     data = get_data(data_folder)
-    print(data.keys())
-    print(data['./raw_data/vaccinations_vs_appointments.csv'])
+    if data['./raw_data/vaccinations_vs_appointments.csv']:
+        local_data = data['./raw_data/vaccinations_vs_appointments.csv']
+        insert_allocation_vs_appointment_in_db(pg_conn, local_data)
+        
 
 main(SCRIPT_NAME, PG_CONN_STRING, DATA_FOLDER)
