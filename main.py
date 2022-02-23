@@ -93,20 +93,30 @@ def read_json_file(file_path):
     data = json.load(file)
     return data
 
-def read_csv_file(file_path, encoding = 'utf-8'):
+def read_csv_file(file_path, encoding = 'windows-1252'):
     file_data = []
     with open(file_path, newline='', encoding=encoding) as csv_file:
         try:
             dialect = csv.Sniffer().sniff(csv_file.read(1024))
             csv_file.seek(0)
-            reader = csv.reader(csv_file, dialect)
-            reader = csv.DictReader(csv_file)
+            reader = csv.DictReader(csv_file, dialect=dialect)
             for row in reader:
                 file_data.append(row)
         except UnicodeDecodeError as e:
             print('unicode error', file_path, e)
+        except Exception as e:
+            print('error reading CSV', file_path, str(e))
+            if 'Could not determine delimiter' == str(e):
+                try: 
+                    dialect = csv.Sniffer().sniff(csv_file.read(1024))
+                    csv_file.seek(0)
+                    reader = csv.DictReader(csv_file, dialect=dialect, delimiter=';')
+                    for row in reader:
+                        file_data.append(row)
+                except:
+                    print('csv delimiter ; did not work')
         except:
-            print('error reading CSV', file_path)
+            print('csv error')
     return file_data
 
 def insert_metadata_in_db(pg_conn_string, metadata):
@@ -125,8 +135,8 @@ def insert_profile_in_db(pg_conn_string, profile):
             # and postgres will now expect a json string
             profile['speciality'] = json.dumps(profile['speciality'])
             cur.execute("""
-            INSERT INTO doctolib_centers_profile( id, name_with_title_and_determiner, name_with_title, speciality, organization, redirect_url, language_list)
-            VALUES ( %(id)s, %(name_with_title_and_determiner)s, %(name_with_title)s, %(speciality)s, %(organization)s, %(redirect_url)s, %(language_list)s);
+            INSERT INTO doctolib_centers_profile(id, name_with_title_and_determiner, name_with_title, speciality, organization, redirect_url, language_list)
+            VALUES (%(id)s, %(name_with_title_and_determiner)s, %(name_with_title)s, %(speciality)s, %(organization)s, %(redirect_url)s, %(language_list)s);
             """,
             profile)
 
@@ -140,24 +150,35 @@ def insert_allocation_vs_appointment_in_db(pg_conn_string, data):
                 ''', item)
             print('table allocation vs appointment created')
 
-def insert_data_in_db():
-    for data_key, centers in data.items():
-        for center in centers:
-            metadata = center['metadata']
-            profile = center['data']['metadata']['profile']
-            insert_metadata_in_db(metadata)
-            insert_profile_in_db(profile)
-
-
+def insert_data_in_db(pg_conn, data):
+    for center in data:
+        metadata = center['metadata']
+        profile = center['data']['metadata']['profile']
+        insert_metadata_in_db(pg_conn, metadata)
+        insert_profile_in_db(pg_conn, profile)
 
 def main(name, pg_conn, data_folder):
     print(name, "is running")
     init_db_tables(pg_conn)
     print('all tables created') 
+    print('starting inserting data in postgresql')
     data = get_data(data_folder)
-    if data['./raw_data/vaccinations_vs_appointments.csv']:
-        local_data = data['./raw_data/vaccinations_vs_appointments.csv']
-        insert_allocation_vs_appointment_in_db(pg_conn, local_data)
-        
+    for key in data.keys():
+        if key.endswith('.json'):
+            json_data = data[key]
+            insert_data_in_db(pg_conn, json_data)
+        if key == './raw_data/vaccinations_vs_appointments.csv':
+            local_data = data['./raw_data/vaccinations_vs_appointments.csv']
+            # insert_allocation_vs_appointment_in_db(pg_conn, local_data)
+        if key == './raw_data/allocations-vs-rdv.csv':
+            local_data = data['./raw_data/allocations-vs-rdv.csv']
+            # print(local_data, "allocation-vs-rdv")
+        if key == './raw_data/stocks.csv':
+            local_data = data['./raw_data/stocks.csv']
+            # print(local_data, 'stock data')
+        if key == './raw_data/vaccination_centers.csv':
+            local_data = data['./raw_data/vaccination_centers.csv']
+            # print(local_data, 'vaccination_centers')
+        print('finished inserting data in postgresql')
 
 main(SCRIPT_NAME, PG_CONN_STRING, DATA_FOLDER)

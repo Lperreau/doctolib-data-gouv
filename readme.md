@@ -20,6 +20,10 @@ Run command `pip install -r requirements.txt`
  1. If you don't you might get the following error: "psycopg.OperationalError: connection failed: FATAL:  Peer authentication failed for user "robot" "
 3. Run `grant all privileges on database doctolib_data to robot;`
 
-## Find CSVs files encoding
+## CSVs files encoding
 1. run command `file -bi raw_data/allocations-vs-rdv.csv `
  . In our case, allocations-vs-rdv has encoding `charset=unknown-8bit` which breaks our function reader to read the csv.
+1. to solve all encoding issues, we force encoding to `windows-1252`.
+
+## CSVs files delimiter
+1. We use function `Sniffer()` to detect delimiter, in case it doesn't work we manually define the delimiter using `try:` `except`.
