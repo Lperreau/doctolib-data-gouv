@@ -13,10 +13,10 @@ def init_db_tables(pg_conn_string):
         print('connected to db')
         with db_conn.cursor() as cur:
             cur.execute("""
-                DROP TABLE IF EXISTS src_stocks, allocation_vs_appointment, doctolib_centers_metadata, doctolib_centers_profile;
+                DROP TABLE IF EXISTS stocks, allocation_vs_appointment, vaccination_centers, allocation_vs_rdv, doctolib_centers_metadata, doctolib_centers_profile;
                 """)
             cur.execute("""
-                CREATE TABLE src_stocks (
+                CREATE TABLE stocks (
                     code_departement VARCHAR(8),
                     departement VARCHAR(64),
                     raison_sociale VARCHAR(128),
@@ -27,18 +27,78 @@ def init_db_tables(pg_conn_string):
                     nb_doses INTEGER,
                     date DATE)
                 """)
-            cur.execute('''
+            cur.execute("""
+                CREATE TABLE vaccination_centers (
+                    gid SERIAL PRIMARY KEY,
+                    nom VARCHAR(256),
+                    arrete_pref_numero VARCHAR(64),
+                    xy_precis VARCHAR(64),
+                    id_adr VARCHAR(32),
+                    adr_num VARCHAR(64),
+                    adr_voie VARCHAR(256),
+                    com_cp INTEGER,
+                    com_insee VARCHAR(32),
+                    com_nom VARCHAR(64),
+                    lat_coor1 REAL,
+                    long_coor1 REAL,
+                    structure_siren VARCHAR(16),
+                    structure_type VARCHAR(8),
+                    structure_rais VARCHAR(256),
+                    structure_num VARCHAR(32),
+                    structure_voie VARCHAR(32),
+                    structure_cp VARCHAR(8),
+                    structure_insee VARCHAR(32),
+                    structure_com VARCHAR(16),
+                    _userid_creation VARCHAR(64),
+                    _userid_modification VARCHAR(64),
+                    _edit_datemaj VARCHAR(32),
+                    lieu_accessibilite TEXT,
+                    rdv_lundi VARCHAR(128),
+                    rdv_mardi VARCHAR(128),
+                    rdv_mercredi VARCHAR(128),
+                    rdv_jeudi VARCHAR(128),
+                    rdv_vendredi VARCHAR(128),
+                    rdv_samedi VARCHAR(128),
+                    rdv_dimanche VARCHAR(128),
+                    rdv VARCHAR(8),
+                    date_fermeture VARCHAR(64),
+                    date_ouverture VARCHAR(64),
+                    rdv_site_web TEXT,
+                    rdv_tel VARCHAR(32),
+                    rdv_tel2 VARCHAR(32),
+                    rdv_modalites TEXT,
+                    rdv_consultation_prevaccination VARCHAR(8),
+                    centre_svi_repondeur VARCHAR(8),
+                    centre_fermeture VARCHAR(8),
+                    reserve_professionels_sante VARCHAR(8),
+                    centre_type VARCHAR(128))
+                """)
+            cur.execute("""
                 CREATE TABLE allocation_vs_appointment (
-                code_region varchar(8),
-                region varchar(64),
-                departement varchar(64),
-                id_centre varchar(64),
-                nom_centre text,
-                rang_vaccinal integer,
-                date_debut_semaine date,
-                nb integer,
-                nb_rdv_cnam integer,
-                nb_rdv_rappel integer
+                    id_centre INTEGER,
+                    date_debut_semaine DATE,
+                    code_region INTEGER,
+                    nom_region VARCHAR(8),
+                    code_departement VARCHAR(8),
+                    nom_departement VARCHAR(64),
+                    commune_insee VARCHAR(8),
+                    nom_centre VARCHAR(256),
+                    nombre_ucd INTEGER,
+                    doses_allouees INTEGER,
+                    rdv_pris INTEGER)
+                """)
+            cur.execute('''
+                CREATE TABLE vaccination_vs_appointment (
+                    code_region INTEGER,
+                    region VARCHAR(8),
+                    departement VARCHAR(8),
+                    id_centre VARCHAR(32),
+                    nom_centre VARCHAR(128),
+                    rang_vaccinal INTEGER,
+                    date_debut_semaine DATE,
+                    nb INTEGER,
+                    nb_rdv_cnam INTEGER,
+                    nb_rdv_rappel INTEGER
             )
             ''')
             cur.execute("""
@@ -105,7 +165,6 @@ def read_csv_file(file_path, encoding = 'windows-1252'):
         except UnicodeDecodeError as e:
             print('unicode error', file_path, e)
         except Exception as e:
-            print('error reading CSV', file_path, str(e))
             if 'Could not determine delimiter' == str(e):
                 try: 
                     dialect = csv.Sniffer().sniff(csv_file.read(1024))
@@ -145,10 +204,41 @@ def insert_allocation_vs_appointment_in_db(pg_conn_string, data):
         with db_conn.cursor() as cur:
             for item in data:
                 cur.execute('''
-                INSERT INTO allocation_vs_appointment(code_region,region,departement,id_centre,nom_centre,rang_vaccinal,date_debut_semaine,nb,nb_rdv_cnam,nb_rdv_rappel) 
-                VALUES (%(code_region)s,%(region)s,%(departement)s,%(id_centre)s,%(nom_centre)s,%(rang_vaccinal)s,%(date_debut_semaine)s,%(nb)s,%(nb_rdv_cnam)s, %(nb_rdv_rappel)s)
+                INSERT INTO allocation_vs_appointment(id_centre, date_debut_semaine, code_region, nom_region, code_departement, nom_departement, commune_insee, nom_centre, nombre_ucd, doses_allouees, rdv_pris) 
+                VALUES ( %(id_centre)s, %(date_debut_semaine)s, %(code_region)s, %(nom_region)s, %(code_departement)s, %(nom_departement)s, %(commune_insee)s, %(nom_centre)s, %(nombre_ucd)s, %(doses_allouees)s, %(rdv_pris)s)
                 ''', item)
             print('table allocation vs appointment created')
+
+def insert_stocks_in_db(pg_conn_string, data):
+    with psycopg.connect(pg_conn_string) as db_conn:
+        with db_conn.cursor() as cur:
+            for item in data:
+                cur.execute('''
+                INSERT INTO stocks(code_departement, departement, raison_sociale, libelle_pui, finess, type_de_vaccin, nb_ucd, nb_doses, date) 
+                VALUES (%(code_departement)s, %(departement)s, %(raison_sociale)s, %(libelle_pui)s, %(finess)s, %(type_de_vaccin)s, %(nb_ucd)s, %(nb_doses)s, %(date)s)
+                ''', item)
+            print('table stocks created')
+
+def insert_vaccination_centers_in_db(pg_conn_string, data):
+    with psycopg.connect(pg_conn_string) as db_conn:
+        with db_conn.cursor() as cur:
+            for item in data:
+                cur.execute('''
+                INSERT INTO vaccination_centers(gid,nom,arrete_pref_numero,xy_precis,id_adr,adr_num,adr_voie,com_cp,com_insee,com_nom,lat_coor1,long_coor1,structure_siren,structure_type,structure_rais,structure_num,structure_voie,structure_cp,structure_insee,structure_com,_userid_creation,_userid_modification,_edit_datemaj,lieu_accessibilite,rdv_lundi,rdv_mardi,rdv_mercredi,rdv_jeudi,rdv_vendredi,rdv_samedi,rdv_dimanche,rdv,date_fermeture,date_ouverture,rdv_site_web,rdv_tel,rdv_tel2,rdv_modalites,rdv_consultation_prevaccination,centre_svi_repondeur,centre_fermeture,reserve_professionels_sante,centre_type) 
+                VALUES ( %(gid)s, %(nom)s, %(arrete_pref_numero)s, %(xy_precis)s, %(id_adr)s, %(adr_num)s, %(adr_voie)s, %(com_cp)s, %(com_insee)s, %(com_nom)s, %(lat_coor1)s, %(long_coor1)s, %(structure_siren)s, %(structure_type)s, %(structure_rais)s, %(structure_num)s, %(structure_voie)s, %(structure_cp)s, %(structure_insee)s, %(structure_com)s, %(_userid_creation)s, %(_userid_modification)s, %(_edit_datemaj)s, %(lieu_accessibilite)s, %(rdv_lundi)s, %(rdv_mardi)s, %(rdv_mercredi)s, %(rdv_jeudi)s, %(rdv_vendredi)s, %(rdv_samedi)s, %(rdv_dimanche)s, %(rdv)s, %(date_fermeture)s, %(date_ouverture)s, %(rdv_site_web)s, %(rdv_tel)s, %(rdv_tel2)s, %(rdv_modalites)s, %(rdv_consultation_prevaccination)s, %(centre_svi_repondeur)s, %(centre_fermeture)s, %(reserve_professionels_sante)s, %(centre_type)s)
+                ''', item)
+            print('table vaccination_centers created')
+
+def insert_vaccination_vs_appointment_in_db(pg_conn_string, data):
+    with psycopg.connect(pg_conn_string) as db_conn:
+        with db_conn.cursor() as cur:
+            for item in data:
+                cur.execute('''
+                INSERT INTO vaccination_vs_appointment(code_region,region,departement,id_centre,nom_centre,rang_vaccinal,date_debut_semaine,nb,nb_rdv_cnam,nb_rdv_rappel) 
+                VALUES (%(code_region)s,%(region)s,%(departement)s,%(id_centre)s,%(nom_centre)s,%(rang_vaccinal)s,%(date_debut_semaine)s,%(nb)s,%(nb_rdv_cnam)s, %(nb_rdv_rappel)s)
+                ''', item)
+            print('table vaccination_vs_appointment created')
+
 
 def insert_data_in_db(pg_conn, data):
     for center in data:
@@ -169,16 +259,16 @@ def main(name, pg_conn, data_folder):
             insert_data_in_db(pg_conn, json_data)
         if key == './raw_data/vaccinations_vs_appointments.csv':
             local_data = data['./raw_data/vaccinations_vs_appointments.csv']
-            # insert_allocation_vs_appointment_in_db(pg_conn, local_data)
+            insert_vaccination_vs_appointment_in_db(pg_conn, local_data)
         if key == './raw_data/allocations-vs-rdv.csv':
             local_data = data['./raw_data/allocations-vs-rdv.csv']
-            # print(local_data, "allocation-vs-rdv")
+            insert_allocation_vs_appointment_in_db(pg_conn, local_data)
         if key == './raw_data/stocks.csv':
             local_data = data['./raw_data/stocks.csv']
-            # print(local_data, 'stock data')
+            insert_stocks_in_db(pg_conn, local_data)
         if key == './raw_data/vaccination_centers.csv':
             local_data = data['./raw_data/vaccination_centers.csv']
-            # print(local_data, 'vaccination_centers')
+            insert_vaccination_centers_in_db(pg_conn, local_data)
         print('finished inserting data in postgresql')
 
 main(SCRIPT_NAME, PG_CONN_STRING, DATA_FOLDER)
